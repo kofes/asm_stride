@@ -29,16 +29,19 @@ clock_end = times(&end);
 #define DELTA_TIME() \
 (double(end.tms_utime - start.tms_utime) / sysconf(_SC_CLK_TCK)) 
 
+
+const static size_t MAX_SIZE_DEG = 20; 
+static uint8_t buffer[1 << MAX_SIZE_DEG];
+
 ///
 #include <cstdint>
-template<size_t many_times, typename stride_type>
-auto test(size_t block_size) -> decltype(DELTA_TIME()) {
-    uint8_t buffer[block_size];
-    stride_type dummy;
+template<size_t many_times>
+auto test(size_t block_size, size_t stride_size) -> decltype(DELTA_TIME()) {
+    volatile uint8_t dummy;
     START_TIME();
     for (auto times = 0u; times < many_times; ++times) {
-        for (auto i = 0u; i < block_size; i += sizeof(stride_type)) {
-            dummy = reinterpret_cast<stride_type&>(buffer[i]);
+        for (auto i = 0u; i < block_size; i += stride_size) {
+            dummy = buffer[i];
         }
     }
     END_TIME();
@@ -46,23 +49,22 @@ auto test(size_t block_size) -> decltype(DELTA_TIME()) {
 }
 
 #include <iostream>
-template<typename stride_type, typename Stream>
+#include <fstream>
+template<typename Stream>
 void benchmark(Stream&& ofstream) {
-    size_t max_size = 1 << 12;
-    for (size_t size = 0u; size < max_size; ++size) {
-        ofstream << size << ' ' << sizeof(stride_type) << ' ' << test<100000, stride_type>(size)  << std::endl;
+    for (auto block_size_deg = 1; block_size_deg < MAX_SIZE_DEG; ++block_size_deg) {
+        auto block_size = 1 << block_size_deg;        
+        std::cout << block_size << std::endl;
+        for (size_t stride_size_deg = 1; stride_size_deg < block_size_deg; ++stride_size_deg) {
+            auto stride_size = 1 << stride_size_deg;
+            auto value = test<10000>(block_size, stride_size);
+            ofstream << block_size << ' ' << stride_size << ' ' << value << std::endl;
+        }
     }
 }
 
 #include <fstream>
 int main(int argc, char const *argv[]) {
-    using type1 = uint8_t;
-    benchmark<type1>(std::ofstream(DEMANGLE(typeid(type1).name()) + ".txt"));
-    using type2 = uint16_t;
-    benchmark<type2>(std::ofstream(DEMANGLE(typeid(type2).name()) + ".txt"));
-    using type3 = uint32_t;
-    benchmark<type3>(std::ofstream(DEMANGLE(typeid(type3).name()) + ".txt"));
-    using type4 = uint64_t;
-    benchmark<type4>(std::ofstream(DEMANGLE(typeid(type4).name()) + ".txt"));
+    benchmark(std::ofstream("output.txt"));
     return 0;
 }

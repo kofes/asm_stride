@@ -31,20 +31,23 @@ clock_end = times(&end);
 
 
 const static size_t MAX_SIZE_DEG = 20; 
-static uint8_t buffer[1 << MAX_SIZE_DEG];
+// static uint8_t buffer[1 << MAX_SIZE_DEG];
 
 ///
 #include <cstdint>
 template<size_t many_times>
 auto test(size_t block_size, size_t stride_size) -> decltype(DELTA_TIME()) {
     volatile uint8_t dummy;
+    uint8_t* buffer = new uint8_t[block_size]; 
+    auto accumulated = 0.0;
     START_TIME();
-    for (auto times = 0u; times < many_times; ++times) {
+    for (auto t = 0u; t < many_times; ++t) {
         for (auto i = 0u; i < block_size; i += stride_size) {
             dummy = buffer[i];
         }
     }
     END_TIME();
+    delete[] buffer;
     return DELTA_TIME();
 }
 
@@ -57,7 +60,7 @@ void benchmark(Stream&& ofstream) {
         std::cout << block_size << std::endl;
         for (size_t stride_size_deg = 1; stride_size_deg < block_size_deg; ++stride_size_deg) {
             auto stride_size = 1 << stride_size_deg;
-            auto value = test<10000>(block_size, stride_size);
+            auto value = test<100000>(block_size, stride_size);
             ofstream << block_size << ' ' << stride_size << ' ' << value << std::endl;
         }
     }
